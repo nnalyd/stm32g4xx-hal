@@ -9,7 +9,7 @@ license = "MIT/Apache-2.0"
 name = "stm32g4xx-hal"
 readme = "README.md"
 repository = "https://github.com/stm32-rs/stm32g4xx-hal"
-version = "0.0.2"
+version = "0.0.0"
 
 [dependencies]
 nb = "0.1.1"
@@ -18,7 +18,6 @@ paste = "1.0"
 bitflags = "1.2"
 vcell = "0.1"
 static_assertions = "1.1"
-fugit = "0.3.5"
 
 [dependencies.cortex-m]
 version = "0.7.7"
@@ -55,10 +54,14 @@ version = "1.1"
 version = "0.3.2"
 optional = true
 
+[dependencies.stm32-usbd]
+version = "0.6"
+optional = true
+
 [dev-dependencies]
 cortex-m-rt = "0.7.2"
 defmt-rtt = "0.4.0"
-cortex-m-rtic = "1.1.4"
+cortex-m-rtic = "0.5.8"
 cortex-m-semihosting = "0.3.5"
 panic-probe = { version = "0.3.0", features = ["print-defmt"] }
 panic-semihosting = "0.5.3"
@@ -68,9 +71,13 @@ lazy_static = { version = "1.4", features = ["spin_no_std"] }
 log = "0.4.11"
 cortex-m-log = { version = "0.7", features = ["log-integration"] }
 cfg-if = "0.1.10"
+rtt-target = { version = "0.3.0", features = ["cortex-m"] }
+panic-rtt-target = { version = "0.1.1", features = ["cortex-m"] }
 mpu6050 = "0.1.4"
 bme680 = "0.6.0"
 embedded-sdmmc = "0.3.0"
+usbd-serial = "0.1.1"
+usb-device = "0.2.8"
 
 #TODO: Separate feature sets
 [features]
@@ -89,6 +96,7 @@ log-itm = ["cortex-m-log/itm"]
 log-rtt = []
 log-semihost = ["cortex-m-log/semihosting"]
 defmt-logging = ["defmt"]
+usb = ["stm32-usbd"]
 
 [profile.dev]
 codegen-units = 1
@@ -103,5 +111,5 @@ incremental = false
 lto = true
 
 [[example]]
-name = "flash_with_rtic"
-required-features = ["stm32g474"]
+name = "usb_serial"
+required-features = ["usb"]
