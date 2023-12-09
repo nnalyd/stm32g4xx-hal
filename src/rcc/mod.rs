@@ -1,6 +1,7 @@
 use crate::stm32::{rcc, FLASH, PWR, RCC};
-use crate::time::{Hertz, RateExtU32};
+use crate::time::{Hertz, U32Ext};
 
+pub mod clock_recovery_system;
 mod clockout;
 mod config;
 mod enable;
@@ -47,7 +48,7 @@ pub struct PLLClocks {
 
 impl Default for Clocks {
     fn default() -> Clocks {
-        let freq = HSI_FREQ.Hz();
+        let freq = HSI_FREQ.hz();
         Clocks {
             sys_clk: freq,
             ahb_clk: freq,
@@ -80,7 +81,7 @@ impl Rcc {
         let (sys_clk, sw_bits) = match rcc_cfg.sys_mux {
             SysClockSrc::HSI => {
                 self.enable_hsi();
-                (HSI_FREQ.Hz(), 0b01)
+                (HSI_FREQ.hz(), 0b01)
             }
             SysClockSrc::HSE(freq) => {
                 self.enable_hse(false);
@@ -95,7 +96,7 @@ impl Rcc {
             }
         };
 
-        let sys_freq = sys_clk.raw();
+        let sys_freq = sys_clk.0;
         let (ahb_freq, ahb_psc_bits) = match rcc_cfg.ahb_psc {
             Prescaler::Div2 => (sys_freq / 2, 0b1000),
             Prescaler::Div4 => (sys_freq / 4, 0b1001),
@@ -105,30 +106,30 @@ impl Rcc {
             Prescaler::Div128 => (sys_freq / 128, 0b1101),
             Prescaler::Div256 => (sys_freq / 256, 0b1110),
             Prescaler::Div512 => (sys_freq / 512, 0b1111),
-            _ => (sys_freq, 0b0000),
+            _ => (sys_clk.0, 0b0000),
         };
         let (apb1_freq, apb1_psc_bits) = match rcc_cfg.apb1_psc {
-            Prescaler::Div2 => (sys_freq / 2, 0b100),
-            Prescaler::Div4 => (sys_freq / 4, 0b101),
-            Prescaler::Div8 => (sys_freq / 8, 0b110),
-            Prescaler::Div16 => (sys_freq / 16, 0b111),
-            _ => (sys_freq, 0b000),
+            Prescaler::Div2 => (sys_clk.0 / 2, 0b100),
+            Prescaler::Div4 => (sys_clk.0 / 4, 0b101),
+            Prescaler::Div8 => (sys_clk.0 / 8, 0b110),
+            Prescaler::Div16 => (sys_clk.0 / 16, 0b111),
+            _ => (sys_clk.0, 0b000),
         };
         let (apb2_freq, apb2_psc_bits) = match rcc_cfg.apb2_psc {
-            Prescaler::Div2 => (sys_freq / 2, 0b100),
-            Prescaler::Div4 => (sys_freq / 4, 0b101),
-            Prescaler::Div8 => (sys_freq / 8, 0b110),
-            Prescaler::Div16 => (sys_freq / 16, 0b111),
-            _ => (sys_freq, 0b000),
+            Prescaler::Div2 => (sys_clk.0 / 2, 0b100),
+            Prescaler::Div4 => (sys_clk.0 / 4, 0b101),
+            Prescaler::Div8 => (sys_clk.0 / 8, 0b110),
+            Prescaler::Div16 => (sys_clk.0 / 16, 0b111),
+            _ => (sys_clk.0, 0b000),
         };
 
         unsafe {
             // Adjust flash wait states
             let flash = &(*FLASH::ptr());
             flash.acr.modify(|_, w| {
-                w.latency().bits(if sys_freq <= 24_000_000 {
+                w.latency().bits(if sys_clk.0 <= 24_000_000 {
                     0b000
-                } else if sys_freq <= 48_000_000 {
+                } else if sys_clk.0 <= 48_000_000 {
                     0b001
                 } else {
                     0b010
@@ -169,12 +170,12 @@ impl Rcc {
             clocks: Clocks {
                 pll_clk,
                 sys_clk,
-                core_clk: ahb_freq.Hz(),
-                ahb_clk: ahb_freq.Hz(),
-                apb1_clk: apb1_freq.Hz(),
-                apb1_tim_clk: apb1_tim_clk.Hz(),
-                apb2_clk: apb2_freq.Hz(),
-                apb2_tim_clk: apb2_tim_clk.Hz(),
+                core_clk: ahb_freq.hz(),
+                ahb_clk: ahb_freq.hz(),
+                apb1_clk: apb1_freq.hz(),
+                apb1_tim_clk: apb1_tim_clk.hz(),
+                apb2_clk: apb2_freq.hz(),
+                apb2_tim_clk: apb2_tim_clk.hz(),
             },
         }
     }
@@ -198,11 +199,11 @@ impl Rcc {
             }
             PLLSrc::HSE(freq) => {
                 self.enable_hse(false);
-                (freq.raw(), 0b11)
+                (freq.0, 0b11)
             }
             PLLSrc::HSE_BYPASS(freq) => {
                 self.enable_hse(true);
-                (freq.raw(), 0b11)
+                (freq.0, 0b11)
             }
         };
 
@@ -212,15 +213,15 @@ impl Rcc {
         // Calculate the output frequencies for the P, Q, and R outputs
         let p = pll_cfg
             .p
-            .map(|p| ((pll_freq / p.divisor()).Hz(), p.register_setting()));
+            .map(|p| ((pll_freq / p.divisor()).hz(), p.register_setting()));
 
         let q = pll_cfg
             .q
-            .map(|q| ((pll_freq / q.divisor()).Hz(), q.register_setting()));
+            .map(|q| ((pll_freq / q.divisor()).hz(), q.register_setting()));
 
         let r = pll_cfg
             .r
-            .map(|r| ((pll_freq / r.divisor()).Hz(), r.register_setting()));
+            .map(|r| ((pll_freq / r.divisor()).hz(), r.register_setting()));
 
         // Set the M input divider, the N multiplier for the PLL, and the PLL source.
         self.rb.pllcfgr.modify(|_, w| unsafe {
@@ -289,6 +290,16 @@ impl Rcc {
     pub(crate) fn enable_lsi(&self) {
         self.rb.csr.modify(|_, w| w.lsion().set_bit());
         while self.rb.csr.read().lsirdy().bit_is_clear() {}
+    }
+
+    pub(crate) fn enable_hsi48(&self) {
+        self.rb.crrcr.modify(|_, w| w.hsi48on().set_bit());
+
+        loop {
+            if self.rb.crrcr.read().hsi48rdy().bit() {
+                break;
+            }
+        }
     }
 }
 
@@ -434,7 +445,6 @@ pub trait RccBus: crate::Sealed {
 pub trait Enable: RccBus {
     fn enable(rcc: &RccRB);
     fn disable(rcc: &RccRB);
-    fn enable_for_sleep_stop(rcc: &RccRB);
 }
 
 /// Reset peripheral
